@@ -4,18 +4,22 @@ import bcrypt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
+import os
 from . import database, models
 
-SECRET_KEY = "your-super-secret-key-for-cp-tracker" # Change this in production
-ALGORITHM = "HS256"
+# Best Practice: Use environment variables for sensitive data
+SECRET_KEY = os.getenv("SECRET_KEY", "your-super-secret-key-for-cp-tracker")
+ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7 # 1 week
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
-def verify_password(plain_password, hashed_password):
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Verifies a plaintext password against a hashed bcrypt password."""
     return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
 
-def get_password_hash(password):
+def get_password_hash(password: str) -> str:
+    """Generates a bcrypt hash for a given plaintext password."""
     return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None):

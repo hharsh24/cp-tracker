@@ -13,6 +13,10 @@ app = FastAPI(title="CP Mastery Tracker API")
 
 @app.post("/signup", response_model=schemas.User)
 def create_user(user: schemas.UserCreate, db: Session = Depends(database.get_db)):
+    """
+    Register a new user in the system.
+    Raises 400 if the username is already taken.
+    """
     db_user = db.query(models.User).filter(models.User.username == user.username).first()
     if db_user:
         raise HTTPException(status_code=400, detail="Username already registered")
@@ -26,6 +30,9 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(database.get_db)
 
 @app.post("/token", response_model=schemas.Token)
 def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(database.get_db)):
+    """
+    Authenticate a user and return a JWT token for session management.
+    """
     user = db.query(models.User).filter(models.User.username == form_data.username).first()
     if not user or not auth.verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
@@ -41,11 +48,17 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db:
 
 @app.get("/users/me", response_model=schemas.User)
 def read_users_me(current_user: models.User = Depends(auth.get_current_user)):
+    """
+    Retrieve the profile information of the currently authenticated user.
+    """
     return current_user
 
 # --- LOGS ---
 @app.post("/logs/", response_model=schemas.Log)
 def create_log(log: schemas.LogCreate, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
+    """
+    Create a new competitive programming problem log for the authenticated user.
+    """
     db_log = models.Log(**log.model_dump(), owner_id=current_user.id)
     db.add(db_log)
     db.commit()
@@ -54,12 +67,18 @@ def create_log(log: schemas.LogCreate, db: Session = Depends(database.get_db), c
 
 @app.get("/logs/", response_model=List[schemas.Log])
 def read_logs(skip: int = 0, limit: int = 100, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
+    """
+    Retrieve all problem logs belonging to the authenticated user.
+    """
     logs = db.query(models.Log).filter(models.Log.owner_id == current_user.id).offset(skip).limit(limit).all()
     # Sort descending by id as a simple proxy for date
     return sorted(logs, key=lambda x: x.id, reverse=True)
 
 @app.delete("/logs/{log_id}")
 def delete_log(log_id: int, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
+    """
+    Delete a specific log by its ID. Ensures the log belongs to the authenticated user.
+    """
     log = db.query(models.Log).filter(models.Log.id == log_id, models.Log.owner_id == current_user.id).first()
     if not log:
         raise HTTPException(status_code=404, detail="Log not found")
@@ -70,6 +89,9 @@ def delete_log(log_id: int, db: Session = Depends(database.get_db), current_user
 # --- TEMPLATES ---
 @app.post("/templates/", response_model=schemas.Template)
 def create_template(template: schemas.TemplateCreate, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
+    """
+    Save a new reusable code template to the user's vault.
+    """
     db_template = models.Template(**template.model_dump(), owner_id=current_user.id)
     db.add(db_template)
     db.commit()
@@ -78,11 +100,17 @@ def create_template(template: schemas.TemplateCreate, db: Session = Depends(data
 
 @app.get("/templates/", response_model=List[schemas.Template])
 def read_templates(skip: int = 0, limit: int = 100, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
+    """
+    Retrieve all saved code templates belonging to the authenticated user.
+    """
     templates = db.query(models.Template).filter(models.Template.owner_id == current_user.id).offset(skip).limit(limit).all()
     return templates
 
 @app.delete("/templates/{template_id}")
 def delete_template(template_id: int, db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
+    """
+    Delete a specific code template by its ID.
+    """
     template = db.query(models.Template).filter(models.Template.id == template_id, models.Template.owner_id == current_user.id).first()
     if not template:
         raise HTTPException(status_code=404, detail="Template not found")
